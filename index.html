@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FmDPS PvP Calculator (Skills)</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 20px;
+      background: #f6f7f8;
+    }
+
+    .wrap { max-width: 640px; margin: 0 auto; }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #ddd;
+      padding: 16px;
+    }
+
+    h2 { margin: 0 0 10px; }
+
+    .pvp-grid {
+      display: grid;
+      grid-template-columns: 1fr 200px 1fr;
+      gap: 8px 10px;
+      align-items: center;
+    }
+
+    .head { font-weight: 800; padding: 6px 0; }
+    .head.left { text-align: left; }
+    .head.center { text-align: center; }
+    .head.right { text-align: right; }
+
+    .subhead { font-weight: 600; color: #444; padding: 0 0 6px; }
+    .subhead.left { text-align: left; }
+    .subhead.center { text-align: center; }
+    .subhead.right { text-align: right; }
+
+    .label { text-align: center; color: #333; font-weight: 650; }
+
+    input[type="number"], select {
+      width: 60%;
+      box-sizing: border-box;
+    }
+
+    .sectionTitle {
+      grid-column: 1 / -1;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #eee;
+      font-weight: 900;
+      color: #222;
+      text-align: center;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr;
+      justify-items: center;
+      margin-top: 16px;
+    }
+
+    button {
+      padding: 8px 14px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+
+    .calcBtn {
+      min-width: 340px; /* ~2x a normal button */
+      font-weight: 700;
+    }
+
+    .results {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .resultCard {
+      border: 1px solid #ddd;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .centerBox {
+      border: 1px solid #ddd;
+      padding: 12px;
+      background: #fff;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .hpGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 8px;
+      align-items: start;
+    }
+
+    .metric {
+      font-weight: 800;
+      font-size: 1.05em;
+      margin-top: 6px;
+    }
+
+    .good { color: #0b5a2a; } /* dark green */
+    .bad { color: #7a1111; }  /* dark red */
+
+    .highlight { font-size: 1.15em; font-weight: 800; }
+
+    .muted {
+      color: #555;
+      margin-top: 6px;
+      white-space: pre-wrap;
+      font-size: 0.95em;
+    }
+
+    .note {
+      color: #666;
+      font-size: 0.92em;
+      white-space: pre-wrap;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      background: #fff;
+      color: #444;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+
+    .skillBox {
+      border: 1px dashed #ddd;
+      padding: 10px;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    .skillBox .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .skillBox .row > * { flex: 1; }
+
+    .sideStack { display: grid; gap: 8px; }
+
+    .compactLabel {
+      display: grid;
+      grid-template-columns: 1fr 190px;
+      align-items: center;
+      gap: 12px;
+    }
+
+    @media (max-width: 920px) {
+      .pvp-grid { grid-template-columns: 1fr; }
+      .label { text-align: left; }
+      .head.right, .subhead.right { text-align: left; }
+      .controls { justify-items: stretch; }
+      .calcBtn { width: 100%; min-width: 0; }
+      .results { grid-template-columns: 1fr; }
+      input[type="number"], select { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2>PvP Calculator</h2>
+
+      <div class="pvp-grid" id="statsGrid">
+        <!-- Top headings -->
+        <div class="head left">You</div>
+        <div class="head center">Stat</div>
+        <div class="head right">Them</div>
+
+        <!-- Clear buttons under headings -->
+        <div class="subhead left"><button type="button" id="you_clear">Clear</button></div>
+        <div class="subhead center"></div>
+        <div class="subhead right"><button type="button" id="them_clear">Clear</button></div>
+
+        <div class="sectionTitle">Damage</div>
+
+        <input type="number" id="you_e1_damage" value="0" step="any" />
+        <div class="label">Total Damage</div>
+        <input type="number" id="them_e1_damage" value="0" step="any" />
+
+        <input type="number" id="you_e1_speed" value="0" step="any" />
+        <div class="label">Attack Speed (%)</div>
+        <input type="number" id="them_e1_speed" value="0" step="any" />
+
+        <input type="number" id="you_e1_double" value="0" step="any" />
+        <div class="label">Double Chance (%)</div>
+        <input type="number" id="them_e1_double" value="0" step="any" />
+
+        <input type="number" id="you_e1_crit" value="0" step="any" />
+        <div class="label">Critical Chance (%)</div>
+        <input type="number" id="them_e1_crit" value="0" step="any" />
+
+        <input type="number" id="you_e1_critdmg" value="0" step="any" />
+        <div class="label">Critical Damage (%)</div>
+        <input type="number" id="them_e1_critdmg" value="0" step="any" />
+
+        <div class="sectionTitle">Survivability</div>
+
+        <input type="number" id="you_h_total" value="0" step="any" />
+        <div class="label">Total Health</div>
+        <input type="number" id="them_h_total" value="0" step="any" />
+
+        <input type="number" id="you_h_regen" value="0" step="any" />
+        <div class="label">Health Regen (%)</div>
+        <input type="number" id="them_h_regen" value="0" step="any" />
+
+        <input type="number" id="you_h_lifesteal" value="0" step="any" />
+        <div class="label">Lifesteal (%)</div>
+        <input type="number" id="them_h_lifesteal" value="0" step="any" />
+
+        <div class="sectionTitle">Skills</div>
+
+        <!-- Enable skills toggle (single, centered) -->
+        <div></div>
+        <label style="display:flex;align-items:center;gap:8px;justify-content:center;margin:0;">
+          <input type="checkbox" id="skills_enabled" />
+          <span style="font-weight:650;">Enable skills</span>
+        </label>
+        <div></div>
+
+        <!-- Per-side skill meta inputs -->
+        <div id="you_skills_section" style="display:none;">
+          <div class="sideStack">
+            <div class="compactLabel"><span>+Skill Damage (%)</span><input type="number" id="you_s_skilldmg" value="0" step="any"></div>
+            <div class="compactLabel"><span>-Skill Cooldown (%)</span><input type="number" id="you_s_cdr" value="0" step="any"></div>
+          </div>
+        </div>
+
+        <div class="label">Skills</div>
+
+        <div id="them_skills_section" style="display:none;">
+          <div class="sideStack">
+            <div class="compactLabel"><span>+Skill Damage (%)</span><input type="number" id="them_s_skilldmg" value="0" step="any"></div>
+            <div class="compactLabel"><span>-Skill Cooldown (%)</span><input type="number" id="them_s_cdr" value="0" step="any"></div>
+          </div>
+        </div>
+
+        <!-- Skill 1/2/3 selectors + dynamic fields -->
+        <div id="you_skillSlots" style="display:none;">
+          <div class="sideStack">
+            <div class="skillBox">
+              <div class="row"><strong>Skill 1</strong><select id="you_s1_name"></select></div>
+              <div class="note" id="you_s1_desc"></div>
+              <div id="you_s1_fields"></div>
+            </div>
+            <div class="skillBox">
+              <div class="row"><strong>Skill 2</strong><select id="you_s2_name"></select></div>
+              <div class="note" id="you_s2_desc"></div>
+              <div id="you_s2_fields"></div>
+            </div>
+            <div class="skillBox">
+              <div class="row"><strong>Skill 3</strong><select id="you_s3_name"></select></div>
+              <div class="note" id="you_s3_desc"></div>
+              <div id="you_s3_fields"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="label">Skill slots</div>
+
+        <div id="them_skillSlots" style="display:none;">
+          <div class="sideStack">
+            <div class="skillBox">
+              <div class="row"><strong>Skill 1</strong><select id="them_s1_name"></select></div>
+              <div class="note" id="them_s1_desc"></div>
+              <div id="them_s1_fields"></div>
+            </div>
+            <div class="skillBox">
+              <div class="row"><strong>Skill 2</strong><select id="them_s2_name"></select></div>
+              <div class="note" id="them_s2_desc"></div>
+              <div id="them_s2_fields"></div>
+            </div>
+            <div class="skillBox">
+              <div class="row"><strong>Skill 3</strong><select id="them_s3_name"></select></div>
+              <div class="note" id="them_s3_desc"></div>
+              <div id="them_s3_fields"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="calcBtn" class="calcBtn" type="button">Calculate</button>
+      </div>
+
+      <!-- Primary results -->
+      <div class="results">
+        <div class="resultCard">
+          <div class="highlight" id="you_dps_out">DPS: —</div>
+          <div class="highlight" id="you_hps_out">HPS: —</div>
+          <div class="muted" id="you_details"></div>
+        </div>
+
+        <div class="resultCard">
+          <div class="highlight" id="them_dps_out">DPS: —</div>
+          <div class="highlight" id="them_hps_out">HPS: —</div>
+          <div class="muted" id="them_details"></div>
+        </div>
+      </div>
+
+      <!-- HP loss (60s outcome) -->
+      <div class="centerBox" id="hp_loss_box">
+        <div class="highlight">HP loss</div>
+        <div class="hpGrid">
+          <div>
+            <div class="metric">Net HP change: <span id="you_net">—</span></div>
+            <div class="metric">%HP lost at 60s: <span id="you_pct">—</span></div>
+          </div>
+          <div>
+            <div class="metric">Net HP change: <span id="them_net">—</span></div>
+            <div class="metric">%HP lost at 60s: <span id="them_pct">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="muted" id="winner_out" style="text-align:center;margin-top:10px;font-weight:700;"></div>
+    </div>
+  </div>
+
+  <script>
+    function $(id) { return document.getElementById(id); }
+
+    function isFiniteNumber(x) {
+      return (typeof x === 'number') && isFinite(x);
+    }
+
+    function valBy(prefix, idSuffix) {
+      var el = $(prefix + '_' + idSuffix);
+      var v = el ? parseFloat(el.value) : NaN;
+      return isFinite(v) ? v : 0;
+    }
+
+    function setBy(prefix, idSuffix, value) {
+      var el = $(prefix + '_' + idSuffix);
+      if (el) el.value = String(value);
+    }
+
+    function formatNumber(n) {
+      if (!isFinite(n)) return '0.00';
+      var abs = Math.abs(n);
+      if (abs >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+      if (abs >= 1000) return (n / 1000).toFixed(2) + 'K';
+      return n.toFixed(2);
+    }
+
+    function clamp01(x) {
+      if (!isFinite(x)) return 0;
+      return Math.max(0, Math.min(1, x));
+    }
+
+    function effectiveCooldown(cdSeconds, cdrPct) {
+      // NOTE: no cap applied yet.
+      var cd = Math.max(0, Number(cdSeconds) || 0);
+      var cdr = clamp01((Number(cdrPct) || 0) / 100);
+      return cd * (1 - cdr);
+    }
+
+    // -----------------
+    // Core math
+    // -----------------
+
+    function computeBaseComponents(prefix) {
+      var damage = valBy(prefix, 'e1_damage');
+      var speed = valBy(prefix, 'e1_speed') / 100;
+
+      // Double chance over 100% has no additional effect (caps at 2.0 multiplier)
+      var dblChance = clamp01(valBy(prefix, 'e1_double') / 100);
+      var critChance = clamp01(valBy(prefix, 'e1_crit') / 100);
+      var critDmg = (valBy(prefix, 'e1_critdmg') / 100) + 0.2;
+
+      var dbl = 1 + dblChance;
+      var crit = 1 + (critChance * critDmg);
+
+      var denom = Math.round(1.5 + (15 / (1 + speed)));
+      var attacksPerSec = denom <= 0 ? 0 : 10 / denom;
+
+      return { damage: damage, dbl: dbl, crit: crit, attacksPerSec: attacksPerSec };
+    }
+
+    function computeHPS(prefix, totalDps, effectiveHealth) {
+      var regenPct = valBy(prefix, 'h_regen') / 100;
+      var lifestealPct = valBy(prefix, 'h_lifesteal') / 100;
+      return (regenPct * effectiveHealth) + (lifestealPct * totalDps);
+    }
+
+    // -----------------
+    // Skills
+    // -----------------
+
+    var SKILLS = {
+      // Buffs (flat)
+      'Meat': { kind: 'buff_hp_flat', desc: 'Increase health by X for X seconds', baseCd: null },
+      'Berserk': { kind: 'buff_dmg_flat', desc: 'Increase your damage by X for X seconds', baseCd: null },
+      'Morale': { kind: 'buff_both_flat', desc: 'Increase damage by X and health by X for X seconds', baseCd: 8.1 },
+      'Higher Morale': { kind: 'buff_both_flat', desc: 'Increase damage by X and health by X for X seconds', baseCd: 8.1 },
+
+      // Damage (single hit)
+      'Thorns': { kind: 'dmg_cast', desc: 'Deal X damage', baseCd: 5.2 },
+      'Shout': { kind: 'dmg_cast', desc: 'Deal X damage', baseCd: null },
+      'Bomb': { kind: 'dmg_cast', desc: 'Deal X damage', baseCd: 6.2 },
+      'Worm': { kind: 'dmg_cast', desc: 'Deal X damage', baseCd: 8.2 },
+      'Strafe Run': { kind: 'dmg_cast', desc: 'Deal X damage', baseCd: 10.2 },
+
+      // Burst damage (per projectile)
+      'Arrows': { kind: 'burst', desc: 'Burst of arrows each dealing X damage', baseCd: 10.2 },
+      'Shurikens': { kind: 'burst', desc: 'Burst of shurikens each dealing X damage', baseCd: null },
+      'Cannon Barrage': { kind: 'burst', desc: 'Burst of cannon balls each dealing X damage', baseCd: null },
+      'Meteorite': { kind: 'burst', desc: 'Burst of meteorites each dealing X damage', baseCd: 9.2 },
+      'Stampede': { kind: 'burst', desc: 'Bull stampede, each dealing X damage', baseCd: 20.2 },
+      'Lightning': { kind: 'burst', desc: 'Bolts each dealing X damage', baseCd: 3.2 },
+
+      // Damage over time
+      'Drone': { kind: 'dot', desc: 'Deal X damage for X seconds', baseCd: 8.1 }
+    };
+
+    var SKILL_ALIASES = {
+      'Arrow Rain': 'Arrows',
+      'Meteor': 'Meteorite',
+      'Strafe': 'Strafe Run',
+      'Buff': 'Meat'
+    };
+
+    function skillKeyFromSelection(name) {
+      var n = String(name || '');
+      return SKILLS[n] ? n : (SKILL_ALIASES[n] || n);
+    }
+
+    function baseCooldownFor(name) {
+      var key = skillKeyFromSelection(name);
+      var def = SKILLS[key];
+      if (!def) return null;
+      return isFiniteNumber(def.baseCd) ? def.baseCd : null;
+    }
+
+    function buildSkillSelectOptions(selectEl) {
+      var opts = [''];
+      for (var k in SKILLS) opts.push(k);
+      selectEl.innerHTML = '';
+      for (var i = 0; i < opts.length; i++) {
+        var name = opts[i];
+        var o = document.createElement('option');
+        o.value = name;
+        o.textContent = name ? name : '(none)';
+        selectEl.appendChild(o);
+      }
+    }
+
+    function renderSkillFields(prefix, slot) {
+      var nameSel = $(prefix + '_' + slot + '_name');
+      var fields = $(prefix + '_' + slot + '_fields');
+      var descEl = $(prefix + '_' + slot + '_desc');
+      if (!nameSel || !fields || !descEl) return;
+
+      var chosen = nameSel.value;
+      var key = skillKeyFromSelection(chosen);
+      var def = SKILLS[key];
+
+      if (!chosen || !def) {
+        descEl.textContent = '';
+        fields.innerHTML = '';
+        return;
+      }
+
+      var baseCdText = isFiniteNumber(def.baseCd) ? (def.baseCd.toFixed(1) + 's') : 'enter';
+      descEl.innerHTML = def.desc + ' <span class="pill">Base CD: ' + baseCdText + '</span>';
+
+      var cdVal = baseCooldownFor(chosen);
+      var cdId = prefix + '_' + slot + '_cd';
+      var durId = prefix + '_' + slot + '_dur';
+
+      var cdDefault = (cdVal === null) ? 0 : cdVal;
+      var html = '';
+      html += '<div class="compactLabel"><span>Cooldown (s)</span><input type="number" id="' + cdId + '" value="' + cdDefault + '" step="any"></div>';
+
+      var base = prefix + '_' + slot;
+
+      if (def.kind === 'dmg_cast') {
+        html += '<div class="compactLabel"><span>Damage (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
+      } else if (def.kind === 'burst') {
+        html += '<div class="compactLabel"><span>Damage per projectile (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
+        html += '<div class="compactLabel"><span>Projectile count (N)</span><input type="number" id="' + base + '_n" value="0" step="any"></div>';
+        html += '<div class="note">Total per cast = X * N.</div>';
+      } else if (def.kind === 'dot') {
+        html += '<div class="compactLabel"><span>Damage per second (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
+        html += '<div class="compactLabel"><span>Duration (s)</span><input type="number" id="' + durId + '" value="0" step="any"></div>';
+      } else if (def.kind === 'buff_hp_flat') {
+        html += '<div class="compactLabel"><span>Health increase (flat) (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
+        html += '<div class="compactLabel"><span>Duration (s)</span><input type="number" id="' + durId + '" value="0" step="any"></div>';
+      } else if (def.kind === 'buff_dmg_flat') {
+        html += '<div class="compactLabel"><span>Damage increase (flat) (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
+        html += '<div class="compactLabel"><span>Duration (s)</span><input type="number" id="' + durId + '" value="0" step="any"></div>';
+      } else if (def.kind === 'buff_both_flat') {
+        html += '<div class="compactLabel"><span>Damage increase (flat) (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
+        html += '<div class="compactLabel"><span>Health increase (flat) (X)</span><input type="number" id="' + base + '_x2" value="0" step="any"></div>';
+        html += '<div class="compactLabel"><span>Duration (s)</span><input type="number" id="' + durId + '" value="0" step="any"></div>';
+      }
+
+      fields.innerHTML = html;
+    }
+
+    function readRenderedSkill(prefix, slot) {
+      var nameSel = $(prefix + '_' + slot + '_name');
+      var name = nameSel ? nameSel.value : '';
+      var key = skillKeyFromSelection(name);
+      var def = SKILLS[key];
+      if (!name || !def) return { kind: 'none' };
+
+      function v(suffix) {
+        var el = $(prefix + '_' + slot + '_' + suffix);
+        var num = el ? parseFloat(el.value) : NaN;
+        return isFinite(num) ? num : 0;
+      }
+
+      return {
+        kind: def.kind,
+        name: key,
+        cd: v('cd'),
+        x1: v('x1'),
+        x2: v('x2'),
+        dur: v('dur'),
+        n: v('n')
+      };
+    }
+
+    function isSkillsEnabled() {
+      var cb = $('skills_enabled');
+      return !!(cb && cb.checked);
+    }
+
+    function computeSkillsImpact(prefix) {
+      if (!isSkillsEnabled()) {
+        return { extraSkillDps: 0, avgAddDamage: 0, avgAddHealth: 0 };
+      }
+
+      var skillDmgMult = 1 + (valBy(prefix, 's_skilldmg') / 100);
+      var cdrPct = valBy(prefix, 's_cdr');
+
+      var skills = [
+        readRenderedSkill(prefix, 's1'),
+        readRenderedSkill(prefix, 's2'),
+        readRenderedSkill(prefix, 's3')
+      ];
+
+      var extraSkillDps = 0;
+      var avgAddDamage = 0;
+      var avgAddHealth = 0;
+
+      for (var i = 0; i < skills.length; i++) {
+        var s = skills[i];
+        if (s.kind === 'none') continue;
+
+        var ecd = effectiveCooldown(s.cd, cdrPct);
+        if (ecd <= 0) continue;
+
+        if (s.kind === 'dmg_cast') {
+          if (s.x1 > 0) extraSkillDps += (s.x1 * skillDmgMult) / ecd;
+        } else if (s.kind === 'burst') {
+          var totalBurst = (s.x1 * Math.max(0, s.n));
+          if (totalBurst > 0) extraSkillDps += (totalBurst * skillDmgMult) / ecd;
+        } else if (s.kind === 'dot') {
+          var totalDot = (s.x1 * Math.max(0, s.dur));
+          if (totalDot > 0) extraSkillDps += (totalDot * skillDmgMult) / ecd;
+        } else if (s.kind === 'buff_hp_flat') {
+          var uptimeHp = clamp01((s.dur || 0) / ecd);
+          avgAddHealth += (s.x1 || 0) * uptimeHp;
+        } else if (s.kind === 'buff_dmg_flat') {
+          var uptimeDmg = clamp01((s.dur || 0) / ecd);
+          avgAddDamage += (s.x1 || 0) * uptimeDmg;
+        } else if (s.kind === 'buff_both_flat') {
+          var uptimeBoth = clamp01((s.dur || 0) / ecd);
+          avgAddDamage += (s.x1 || 0) * uptimeBoth;
+          avgAddHealth += (s.x2 || 0) * uptimeBoth;
+        }
+      }
+
+      return { extraSkillDps: extraSkillDps, avgAddDamage: avgAddDamage, avgAddHealth: avgAddHealth };
+    }
+
+    function calculateSide(prefix) {
+      var base = computeBaseComponents(prefix);
+      var baseHealth = valBy(prefix, 'h_total');
+
+      var skills = computeSkillsImpact(prefix);
+
+      // Apply flat buffs as average add to the underlying stats.
+      var effDamage = base.damage + skills.avgAddDamage;
+      var effHealth = baseHealth + skills.avgAddHealth;
+
+      var autoAttackDps = effDamage * base.dbl * base.crit * base.attacksPerSec;
+      var totalDps = autoAttackDps + skills.extraSkillDps;
+      var totalHps = computeHPS(prefix, totalDps, effHealth);
+
+      var dpsEl = $(prefix + '_dps_out');
+      var hpsEl = $(prefix + '_hps_out');
+      var detailsEl = $(prefix + '_details');
+
+      if (dpsEl) dpsEl.textContent = 'DPS: ' + formatNumber(totalDps);
+      if (hpsEl) hpsEl.textContent = 'HPS: ' + formatNumber(totalHps);
+
+      var lifestealPart = (valBy(prefix, 'h_lifesteal') / 100) * totalDps;
+      var regenPart = (valBy(prefix, 'h_regen') / 100) * effHealth;
+
+      if (detailsEl) {
+        detailsEl.textContent =
+          'Auto-attack DPS: ' + formatNumber(autoAttackDps) + '\n' +
+          'Skill DPS added: ' + formatNumber(skills.extraSkillDps) + '\n' +
+          'Avg +Damage from buffs: ' + formatNumber(skills.avgAddDamage) + '\n' +
+          'Avg +Health from buffs: ' + formatNumber(skills.avgAddHealth) + '\n' +
+          'Effective Damage used: ' + formatNumber(effDamage) + '\n' +
+          'Effective Health used: ' + formatNumber(effHealth) + '\n' +
+          'Lifesteal contribution: ' + formatNumber(lifestealPart) + '\n' +
+          'Regen contribution: ' + formatNumber(regenPart);
+      }
+
+      return { totalDps: totalDps, totalHps: totalHps, effHealth: effHealth, effDamage: effDamage };
+    }
+
+    function computeOutcome(youRes, themRes) {
+      // PvP mechanic: displayed/profile health is multiplied by 5 for the actual PvP HP pool.
+      // This multiplier does NOT affect regen calculation (handled elsewhere); it only affects HP-loss/TTK.
+      var PVP_HP_MULT = 5;
+
+      function outcomeFor(selfRes, oppRes) {
+        var profileHp = Math.max(0, Number(selfRes.effHealth) || 0);
+        var pvpHp = profileHp * PVP_HP_MULT;
+
+        var incoming = Math.max(0, Number(oppRes.totalDps) || 0);
+        var sustain = Math.max(0, Number(selfRes.totalHps) || 0);
+
+        var deficitPerSec = incoming - sustain; // positive means losing HP
+        var lossPerSec = Math.max(0, deficitPerSec);
+
+        // Over a 60s window, HP lost is capped by the *PvP HP pool*.
+        var loss60 = lossPerSec * 60;
+        var cappedLoss60 = pvpHp > 0 ? Math.min(pvpHp, loss60) : 0;
+        var pctLost = pvpHp > 0 ? (cappedLoss60 / pvpHp) : 0;
+
+        // Net HP change still shown in HP/s (regen - incoming). Positive means regen dominates.
+        var netPerSec = sustain - incoming;
+
+        // Time to reach 0 (PvP HP pool)
+        var timeToZero = (deficitPerSec > 0 && pvpHp > 0) ? (pvpHp / deficitPerSec) : Infinity;
+
+        return {
+          netPerSec: netPerSec,
+          pctLost: pctLost,
+          profileHp: profileHp,
+          pvpHp: pvpHp,
+          deficitPerSec: deficitPerSec,
+          timeToZero: timeToZero
+        };
+      }
+
+      var youOut = outcomeFor(youRes, themRes);
+      var themOut = outcomeFor(themRes, youRes);
+
+      // Display values
+      var youNetEl = $('you_net');
+      var themNetEl = $('them_net');
+      var youPctEl = $('you_pct');
+      var themPctEl = $('them_pct');
+
+      if (youNetEl) {
+        if (youOut.netPerSec > 0) {
+          youNetEl.textContent = 'Regen too high';
+        } else {
+          youNetEl.textContent = formatNumber(youOut.netPerSec) + ' HP/s';
+        }
+      }
+      if (themNetEl) {
+        if (themOut.netPerSec > 0) {
+          themNetEl.textContent = 'Regen too high';
+        } else {
+          themNetEl.textContent = formatNumber(themOut.netPerSec) + ' HP/s';
+        }
+      }
+      if (youPctEl) youPctEl.textContent = (youOut.pctLost * 100).toFixed(1) + '%';
+      if (themPctEl) themPctEl.textContent = (themOut.pctLost * 100).toFixed(1) + '%';
+
+      // Color coding
+      function setGoodBad(aEl, bEl, aBetter) {
+        if (!aEl || !bEl) return;
+        aEl.classList.remove('good', 'bad');
+        bEl.classList.remove('good', 'bad');
+        aEl.classList.add(aBetter ? 'good' : 'bad');
+        bEl.classList.add(aBetter ? 'bad' : 'good');
+      }
+
+      // Net HP change: higher -> green
+      // Treat positive net HP (regen dominates) as best possible outcome
+      setGoodBad(
+        youNetEl,
+        themNetEl,
+        (youOut.netPerSec > 0 && themOut.netPerSec <= 0) ||
+        (youOut.netPerSec >= themOut.netPerSec)
+      );
+      // %HP lost at 60s: inverted per request (higher -> green)
+      setGoodBad(youPctEl, themPctEl, youOut.pctLost >= themOut.pctLost);
+
+      // Winner logic with early death (100% PvP HP lost before 60s)
+      var winnerEl = $('winner_out');
+      if (winnerEl) {
+        var tYou = youOut.timeToZero;
+        var tThem = themOut.timeToZero;
+
+        var msg = '';
+
+        if (tYou <= 60 || tThem <= 60) {
+          if (tYou < tThem) {
+            msg = 'You lose 100% health after ' + formatNumber(tYou) + ' seconds.';
+          } else if (tThem < tYou) {
+            msg = 'They lose 100% health after ' + formatNumber(tThem) + ' seconds.';
+          } else {
+            msg = 'Both reach 0 health after ' + formatNumber(tYou) + ' seconds (tie).';
+          }
+        } else {
+          var eps = 1e-9;
+          if (Math.abs(youOut.pctLost - themOut.pctLost) < eps) {
+            msg = 'After 60s: Tie (equal %HP lost).';
+          } else if (youOut.pctLost > themOut.pctLost) {
+            msg = 'After 60s: You lose (higher %HP lost).';
+          } else {
+            msg = 'After 60s: You win (they lose more %HP).';
+          }
+        }
+
+        winnerEl.textContent = msg;
+      }
+
+      return { you: youOut, them: themOut };
+    }
+
+    function calculateAll() {
+      var youRes = calculateSide('you');
+      var themRes = calculateSide('them');
+      computeOutcome(youRes, themRes);
+    }
+
+    // -----------------
+    // Clear helpers
+    // -----------------
+
+    function clearResults(prefix) {
+      var dpsEl = $(prefix + '_dps_out');
+      var hpsEl = $(prefix + '_hps_out');
+      var detailsEl = $(prefix + '_details');
+
+      if (dpsEl) dpsEl.textContent = 'DPS: —';
+      if (hpsEl) hpsEl.textContent = 'HPS: —';
+      if (detailsEl) detailsEl.textContent = '';
+
+      // HP loss box (shared)
+      var youNetEl = $('you_net');
+      var themNetEl = $('them_net');
+      var youPctEl = $('you_pct');
+      var themPctEl = $('them_pct');
+
+      if (youNetEl) { youNetEl.textContent = '—'; youNetEl.classList.remove('good','bad'); }
+      if (themNetEl) { themNetEl.textContent = '—'; themNetEl.classList.remove('good','bad'); }
+      if (youPctEl) { youPctEl.textContent = '—'; youPctEl.classList.remove('good','bad'); }
+      if (themPctEl) { themPctEl.textContent = '—'; themPctEl.classList.remove('good','bad'); }
+
+      var winnerEl = $('winner_out');
+      if (winnerEl) winnerEl.textContent = '';
+    }
+
+    function clearSide(prefix) {
+      var coreIds = ['e1_damage','e1_speed','e1_double','e1_crit','e1_critdmg','h_total','h_regen','h_lifesteal'];
+      for (var i = 0; i < coreIds.length; i++) setBy(prefix, coreIds[i], 0);
+
+      setBy(prefix, 's_skilldmg', 0);
+      setBy(prefix, 's_cdr', 0);
+
+      var slots = ['s1','s2','s3'];
+      for (var s = 0; s < slots.length; s++) {
+        var slot = slots[s];
+        var sel = $(prefix + '_' + slot + '_name');
+        if (sel) sel.value = '';
+        var desc = $(prefix + '_' + slot + '_desc');
+        if (desc) desc.textContent = '';
+        var fields = $(prefix + '_' + slot + '_fields');
+        if (fields) fields.innerHTML = '';
+      }
+
+      clearResults(prefix);
+    }
+
+    // -----------------
+    // Visibility
+    // -----------------
+
+    function applySkillsVisibilityAll() {
+      var enabled = isSkillsEnabled();
+      var ids = ['you_skills_section','them_skills_section','you_skillSlots','them_skillSlots'];
+      for (var i = 0; i < ids.length; i++) {
+        var el = $(ids[i]);
+        if (!el) continue;
+        el.style.display = enabled ? 'block' : 'none';
+      }
+    }
+
+    // -----------------
+    // Init
+    // -----------------
+
+    function initSide(prefix) {
+      var slots = ['s1','s2','s3'];
+      for (var i = 0; i < slots.length; i++) {
+        var slot = slots[i];
+        var sel = $(prefix + '_' + slot + '_name');
+        if (!sel) continue;
+        buildSkillSelectOptions(sel);
+        (function (p, s) {
+          sel.addEventListener('change', function () {
+            renderSkillFields(p, s);
+          });
+        })(prefix, slot);
+        renderSkillFields(prefix, slot);
+      }
+
+      var clearBtn = $(prefix + '_clear');
+      if (clearBtn) clearBtn.addEventListener('click', function () { clearSide(prefix); });
+
+      clearResults(prefix);
+    }
+
+    // -----------------
+    // Tests
+    // -----------------
+
+    function assertExists(id) {
+      var el = $(id);
+      console.assert(!!el, 'Expected element #' + id + ' to exist');
+      return el;
+    }
+
+    function runTests() {
+      console.assert(typeof calculateAll === 'function');
+      console.assert(formatNumber(1500) === '1.50K');
+      console.assert((12.34).toFixed(1) === '12.3');
+
+      console.assert(effectiveCooldown(10, 0) === 10, 'CDR 0% should not change cooldown');
+      console.assert(effectiveCooldown(10, 50) === 5, 'CDR 50% should halve cooldown');
+
+      console.assert(baseCooldownFor('Thorns') === 5.2, 'Thorns base CD');
+      console.assert(baseCooldownFor('Arrow Rain') === 10.2, 'Arrow Rain should alias to Arrows');
+      console.assert(baseCooldownFor('Meteor') === 9.2, 'Meteor should alias to Meteorite');
+      console.assert(baseCooldownFor('Strafe') === 10.2, 'Strafe should alias to Strafe Run');
+
+      assertExists('you_e1_damage');
+      assertExists('them_e1_damage');
+      assertExists('you_clear');
+      assertExists('them_clear');
+      assertExists('calcBtn');
+      assertExists('skills_enabled');
+      assertExists('you_dps_out');
+      assertExists('them_dps_out');
+      assertExists('you_net');
+      assertExists('them_net');
+      assertExists('you_pct');
+      assertExists('them_pct');
+
+      // Skills UI hidden by default
+      (function () {
+        var cb = $('skills_enabled');
+        if (!cb) return;
+        cb.checked = false;
+        applySkillsVisibilityAll();
+        console.assert($('you_skillSlots').style.display === 'none', 'You skill slots should be hidden when skills disabled');
+        console.assert($('them_skillSlots').style.display === 'none', 'Them skill slots should be hidden when skills disabled');
+      })();
+
+      // Outcome basic sanity
+      (function () {
+        var a = { totalDps: 100, totalHps: 80, effHealth: 1000, effDamage: 0 };
+        var b = { totalDps: 90, totalHps: 50, effHealth: 1000, effDamage: 0 };
+        var res = computeOutcome(a, b);
+        console.assert(res.you.pctLost >= 0 && res.you.pctLost <= 1, 'pctLost in range');
+        console.assert(res.them.pctLost >= 0 && res.them.pctLost <= 1, 'pctLost in range');
+        console.assert(res.you.pvpHp === 5000, 'PvP HP should be profileHp * 5');
+      })();
+
+      // Matching inputs produce matching outputs.
+      (function () {
+        setBy('you', 'e1_damage', 100);
+        setBy('you', 'e1_speed', 10);
+        setBy('you', 'e1_double', 50);
+        setBy('you', 'e1_crit', 25);
+        setBy('you', 'e1_critdmg', 50);
+        setBy('you', 'h_total', 1000);
+        setBy('you', 'h_regen', 10);
+        setBy('you', 'h_lifesteal', 5);
+
+        setBy('them', 'e1_damage', 100);
+        setBy('them', 'e1_speed', 10);
+        setBy('them', 'e1_double', 50);
+        setBy('them', 'e1_crit', 25);
+        setBy('them', 'e1_critdmg', 50);
+        setBy('them', 'h_total', 1000);
+        setBy('them', 'h_regen', 10);
+        setBy('them', 'h_lifesteal', 5);
+
+        var ra = calculateSide('you');
+        var rb = calculateSide('them');
+
+        console.assert(Math.abs(ra.totalDps - rb.totalDps) < 1e-9, 'Matching inputs should match DPS');
+        console.assert(Math.abs(ra.totalHps - rb.totalHps) < 1e-9, 'Matching inputs should match HPS');
+
+        clearSide('you');
+        clearSide('them');
+      })();
+
+      // Double chance cap at 100% -> multiplier 2.0
+      (function () {
+        setBy('you', 'e1_damage', 100);
+        setBy('you', 'e1_speed', 0);
+        setBy('you', 'e1_double', 500);
+        setBy('you', 'e1_crit', 0);
+        setBy('you', 'e1_critdmg', 0);
+        var base = computeBaseComponents('you');
+        console.assert(Math.abs(base.dbl - 2) < 1e-9, 'Double multiplier should cap at 2.0');
+        clearSide('you');
+      })();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      initSide('you');
+      initSide('them');
+
+      var btn = $('calcBtn');
+      if (btn) btn.addEventListener('click', calculateAll);
+
+      var skillsCb = $('skills_enabled');
+      if (skillsCb) {
+        skillsCb.checked = false;
+        skillsCb.addEventListener('change', applySkillsVisibilityAll);
+      }
+
+      applySkillsVisibilityAll();
+      runTests();
+    });
+  </script>
+  <div style="margin-top:12px; text-align:center; color:#333; font-size:1em;">2025 [OPZ] speedbumps</div>
+</body>
+</html>

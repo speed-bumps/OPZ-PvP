@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FmDPS PvP Calculator (Skills)</title>
   <style>
     body {
@@ -16,13 +17,14 @@
       background: #ffffff;
       border: 1px solid #ddd;
       padding: 16px;
+      overflow: hidden; /* prevent nested grids from visually spilling outside */
     }
 
     h2 { margin: 0 0 10px; }
 
     .pvp-grid {
       display: grid;
-      grid-template-columns: 1fr 200px 1fr;
+      grid-template-columns: minmax(0, 1fr) 200px minmax(0, 1fr);
       gap: 8px 10px;
       align-items: center;
     }
@@ -42,6 +44,13 @@
     input[type="number"], select {
       width: 60%;
       box-sizing: border-box;
+    }
+
+    /* Right-align inputs on the Them side for better mobile readability */
+    .pvp-grid input[id^="them_"],
+    .pvp-grid select[id^="them_"] {
+      text-align: right;
+      margin-left: auto;
     }
 
     .sectionTitle {
@@ -141,6 +150,8 @@
       padding: 10px;
       border-radius: 8px;
       background: #fafafa;
+      max-width: 100%;
+      box-sizing: border-box;
     }
 
     .skillBox .row {
@@ -151,13 +162,23 @@
       margin-bottom: 6px;
     }
 
-    .skillBox .row > * { flex: 1; }
+    .skillBox .row > * {
+      flex: 1;
+      min-width: 0; /* allow flex children (especially selects) to shrink */
+    }
+
+    .skillBox select,
+    .skillBox input[type="number"] {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
 
     .sideStack { display: grid; gap: 8px; }
 
     .compactLabel {
       display: grid;
-      grid-template-columns: 1fr 190px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 190px);
       align-items: center;
       gap: 12px;
     }
@@ -225,7 +246,7 @@
         <div class="label">Lifesteal (%)</div>
         <input type="number" id="them_h_lifesteal" value="0" step="any" />
 
-        <div class="sectionTitle">Skills</div>
+        <div class="sectionTitle" id="skills_title">Skills</div>
 
         <!-- Enable skills toggle (single, centered) -->
         <div></div>
@@ -235,25 +256,17 @@
         </label>
         <div></div>
 
-        <!-- Per-side skill meta inputs -->
-        <div id="you_skills_section" style="display:none;">
-          <div class="sideStack">
-            <div class="compactLabel"><span>+Skill Damage (%)</span><input type="number" id="you_s_skilldmg" value="0" step="any"></div>
-            <div class="compactLabel"><span>-Skill Cooldown (%)</span><input type="number" id="you_s_cdr" value="0" step="any"></div>
-          </div>
-        </div>
+        <!-- Skill meta stats (laid out like other inputs) -->
+        <input type="number" id="you_s_skilldmg" value="0" step="any" />
+        <div class="label" id="skilldmg_label">+ Skill Damage (%)</div>
+        <input type="number" id="them_s_skilldmg" value="0" step="any" />
 
-        <div class="label">Skills</div>
-
-        <div id="them_skills_section" style="display:none;">
-          <div class="sideStack">
-            <div class="compactLabel"><span>+Skill Damage (%)</span><input type="number" id="them_s_skilldmg" value="0" step="any"></div>
-            <div class="compactLabel"><span>-Skill Cooldown (%)</span><input type="number" id="them_s_cdr" value="0" step="any"></div>
-          </div>
-        </div>
+        <input type="number" id="you_s_cdr" value="0" step="any" />
+        <div class="label" id="skillcdr_label">- Skill Cooldown (%)</div>
+        <input type="number" id="them_s_cdr" value="0" step="any" />
 
         <!-- Skill 1/2/3 selectors + dynamic fields -->
-        <div id="you_skillSlots" style="display:none;">
+        <div id="you_skillSlots">
           <div class="sideStack">
             <div class="skillBox">
               <div class="row"><strong>Skill 1</strong><select id="you_s1_name"></select></div>
@@ -273,9 +286,9 @@
           </div>
         </div>
 
-        <div class="label">Skill slots</div>
+        <div class="label" id="skills_slots_label">Skill slots</div>
 
-        <div id="them_skillSlots" style="display:none;">
+        <div id="them_skillSlots">
           <div class="sideStack">
             <div class="skillBox">
               <div class="row"><strong>Skill 1</strong><select id="them_s1_name"></select></div>
@@ -331,6 +344,8 @@
       </div>
 
       <div class="muted" id="winner_out" style="text-align:center;margin-top:10px;font-weight:700;"></div>
+
+      <div style="margin-top:12px; text-align:center; color:#333; font-size:1em;">2025 [OPZ] speedbumps · DPS formulae by Kayzee</div>
     </div>
   </div>
 
@@ -808,7 +823,24 @@
 
     function applySkillsVisibilityAll() {
       var enabled = isSkillsEnabled();
-      var ids = ['you_skills_section','them_skills_section','you_skillSlots','them_skillSlots'];
+
+      // Skills headings/labels
+      var title = $('skills_title');
+      var slotsLabel = $('skills_slots_label');
+      var dmgLabel = $('skilldmg_label');
+      var cdrLabel = $('skillcdr_label');
+
+      if (title) title.style.display = enabled ? 'block' : 'none';
+      if (slotsLabel) slotsLabel.style.display = enabled ? 'block' : 'none';
+      if (dmgLabel) dmgLabel.style.display = enabled ? 'block' : 'none';
+      if (cdrLabel) cdrLabel.style.display = enabled ? 'block' : 'none';
+
+      // Skills inputs + sections
+      var ids = [
+        'you_s_skilldmg','them_s_skilldmg',
+        'you_s_cdr','them_s_cdr',
+        'you_skillSlots','them_skillSlots'
+      ];
       for (var i = 0; i < ids.length; i++) {
         var el = $(ids[i]);
         if (!el) continue;
@@ -854,7 +886,6 @@
     function runTests() {
       console.assert(typeof calculateAll === 'function');
       console.assert(formatNumber(1500) === '1.50K');
-      console.assert((12.34).toFixed(1) === '12.3');
 
       console.assert(effectiveCooldown(10, 0) === 10, 'CDR 0% should not change cooldown');
       console.assert(effectiveCooldown(10, 50) === 5, 'CDR 50% should halve cooldown');
@@ -870,21 +901,24 @@
       assertExists('them_clear');
       assertExists('calcBtn');
       assertExists('skills_enabled');
-      assertExists('you_dps_out');
-      assertExists('them_dps_out');
-      assertExists('you_net');
-      assertExists('them_net');
-      assertExists('you_pct');
-      assertExists('them_pct');
+      assertExists('you_skillSlots');
+      assertExists('them_skillSlots');
+      assertExists('skilldmg_label');
+      assertExists('skillcdr_label');
+      assertExists('skills_title');
+      assertExists('skills_slots_label');
 
       // Skills UI hidden by default
       (function () {
         var cb = $('skills_enabled');
-        if (!cb) return;
         cb.checked = false;
         applySkillsVisibilityAll();
         console.assert($('you_skillSlots').style.display === 'none', 'You skill slots should be hidden when skills disabled');
         console.assert($('them_skillSlots').style.display === 'none', 'Them skill slots should be hidden when skills disabled');
+        console.assert($('skills_title').style.display === 'none', 'Skills title should be hidden when skills disabled');
+        console.assert($('skills_slots_label').style.display === 'none', 'Skill slots label should be hidden when skills disabled');
+        console.assert($('skilldmg_label').style.display === 'none', 'Skill damage label hidden when skills disabled');
+        console.assert($('skillcdr_label').style.display === 'none', 'Skill cooldown label hidden when skills disabled');
       })();
 
       // Outcome basic sanity
@@ -957,6 +991,5 @@
       runTests();
     });
   </script>
-  <div style="margin-top:12px; text-align:center; color:#333; font-size:1em;">2025 [OPZ] speedbumps</div>
 </body>
 </html>

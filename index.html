@@ -184,9 +184,20 @@
     }
 
     @media (max-width: 920px) {
-      .pvp-grid { grid-template-columns: 1fr; }
-      .label { text-align: left; }
-      .head.right, .subhead.right { text-align: left; }
+      /* Mobile layout: 2 columns (You vs Them). Stat labels span full width. */
+      .pvp-grid { grid-template-columns: 1fr 1fr; }
+
+      /* Hide the center column headings/spacer row on mobile */
+      .head.center, .subhead.center { display: none; }
+
+      /* Make labels and section titles span across both columns */
+      .label { grid-column: 1 / -1; text-align: left; }
+      .sectionTitle { grid-column: 1 / -1; }
+
+      /* Skills toggle should span both columns */
+      #skills_toggle { grid-column: 1 / -1; justify-content: center; }
+      .skillsSpacer { display: none; }
+
       .controls { justify-items: stretch; }
       .calcBtn { width: 100%; min-width: 0; }
       .results { grid-template-columns: 1fr; }
@@ -249,18 +260,12 @@
         <div class="sectionTitle" id="skills_title">Skills</div>
 
         <!-- Enable skills toggle (single, centered) -->
-        <div></div>
-        <label style="display:flex;align-items:center;gap:8px;justify-content:center;margin:0;">
+        <div class="skillsSpacer"></div>
+        <label id="skills_toggle" style="display:flex;align-items:center;gap:8px;justify-content:center;margin:0;">
           <input type="checkbox" id="skills_enabled" />
           <span style="font-weight:650;">Enable skills</span>
         </label>
-        <div></div>
-
-        <!-- Skill meta stats (laid out like other inputs) -->
-        <input type="number" id="you_s_skilldmg" value="0" step="any" />
-        <div class="label" id="skilldmg_label">+ Skill Damage (%)</div>
-        <input type="number" id="them_s_skilldmg" value="0" step="any" />
-
+        <div class="skillsSpacer"></div>
         <input type="number" id="you_s_cdr" value="0" step="any" />
         <div class="label" id="skillcdr_label">- Skill Cooldown (%)</div>
         <input type="number" id="them_s_cdr" value="0" step="any" />
@@ -510,8 +515,13 @@
         html += '<div class="compactLabel"><span>Damage (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
       } else if (def.kind === 'burst') {
         html += '<div class="compactLabel"><span>Damage per projectile (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
-        html += '<div class="compactLabel"><span>Projectile count (N)</span><input type="number" id="' + base + '_n" value="0" step="any"></div>';
-        html += '<div class="note">Total per cast = X * N.</div>';
+        if (key === 'Meteorite') {
+          html += '<div class="compactLabel"><span>Projectile count (N)</span><input type="number" id="' + base + '_n" value="5" step="any" disabled></div>';
+          html += '<div class="note">Meteorite always has 5 projectiles.</div>';
+        } else {
+          html += '<div class="compactLabel"><span>Projectile count (N)</span><input type="number" id="' + base + '_n" value="0" step="any"></div>';
+          html += '<div class="note">Total per cast = X * N.</div>';
+        }
       } else if (def.kind === 'dot') {
         html += '<div class="compactLabel"><span>Damage per second (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
         html += '<div class="compactLabel"><span>Duration (s)</span><input type="number" id="' + durId + '" value="0" step="any"></div>';
@@ -564,7 +574,7 @@
         return { extraSkillDps: 0, avgAddDamage: 0, avgAddHealth: 0 };
       }
 
-      var skillDmgMult = 1 + (valBy(prefix, 's_skilldmg') / 100);
+      var skillDmgMult = 1; // Skill damage is already reflected in the entered skill values
       var cdrPct = valBy(prefix, 's_cdr');
 
       var skills = [
@@ -800,7 +810,6 @@
       var coreIds = ['e1_damage','e1_speed','e1_double','e1_crit','e1_critdmg','h_total','h_regen','h_lifesteal'];
       for (var i = 0; i < coreIds.length; i++) setBy(prefix, coreIds[i], 0);
 
-      setBy(prefix, 's_skilldmg', 0);
       setBy(prefix, 's_cdr', 0);
 
       var slots = ['s1','s2','s3'];
@@ -827,17 +836,16 @@
       // Skills headings/labels
       var title = $('skills_title');
       var slotsLabel = $('skills_slots_label');
-      var dmgLabel = $('skilldmg_label');
+
       var cdrLabel = $('skillcdr_label');
 
       if (title) title.style.display = enabled ? 'block' : 'none';
       if (slotsLabel) slotsLabel.style.display = enabled ? 'block' : 'none';
-      if (dmgLabel) dmgLabel.style.display = enabled ? 'block' : 'none';
+
       if (cdrLabel) cdrLabel.style.display = enabled ? 'block' : 'none';
 
       // Skills inputs + sections
       var ids = [
-        'you_s_skilldmg','them_s_skilldmg',
         'you_s_cdr','them_s_cdr',
         'you_skillSlots','them_skillSlots'
       ];
@@ -903,7 +911,7 @@
       assertExists('skills_enabled');
       assertExists('you_skillSlots');
       assertExists('them_skillSlots');
-      assertExists('skilldmg_label');
+
       assertExists('skillcdr_label');
       assertExists('skills_title');
       assertExists('skills_slots_label');
@@ -917,7 +925,7 @@
         console.assert($('them_skillSlots').style.display === 'none', 'Them skill slots should be hidden when skills disabled');
         console.assert($('skills_title').style.display === 'none', 'Skills title should be hidden when skills disabled');
         console.assert($('skills_slots_label').style.display === 'none', 'Skill slots label should be hidden when skills disabled');
-        console.assert($('skilldmg_label').style.display === 'none', 'Skill damage label hidden when skills disabled');
+
         console.assert($('skillcdr_label').style.display === 'none', 'Skill cooldown label hidden when skills disabled');
       })();
 

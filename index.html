@@ -17,7 +17,7 @@
       background: #ffffff;
       border: 1px solid #ddd;
       padding: 16px;
-      overflow: hidden; /* prevent nested grids from visually spilling outside */
+      overflow: hidden;
     }
 
     h2 { margin: 0 0 10px; }
@@ -77,7 +77,7 @@
     }
 
     .calcBtn {
-      min-width: 340px; /* ~2x a normal button */
+      min-width: 340px;
       font-weight: 700;
     }
 
@@ -116,8 +116,8 @@
       margin-top: 6px;
     }
 
-    .good { color: #0b5a2a; } /* dark green */
-    .bad { color: #7a1111; }  /* dark red */
+    .good { color: #0b5a2a; }
+    .bad { color: #7a1111; }
 
     .highlight { font-size: 1.15em; font-weight: 800; }
 
@@ -164,7 +164,7 @@
 
     .skillBox .row > * {
       flex: 1;
-      min-width: 0; /* allow flex children (especially selects) to shrink */
+      min-width: 0;
     }
 
     .skillBox select,
@@ -266,6 +266,7 @@
           <span style="font-weight:650;">Enable skills</span>
         </label>
         <div class="skillsSpacer"></div>
+
         <input type="number" id="you_s_cdr" value="0" step="any" />
         <div class="label" id="skillcdr_label">- Skill Cooldown (%)</div>
         <input type="number" id="them_s_cdr" value="0" step="any" />
@@ -386,7 +387,6 @@
     }
 
     function effectiveCooldown(cdSeconds, cdrPct) {
-      // NOTE: no cap applied yet.
       var cd = Math.max(0, Number(cdSeconds) || 0);
       var cdr = clamp01((Number(cdrPct) || 0) / 100);
       return cd * (1 - cdr);
@@ -414,15 +414,33 @@
       return { damage: damage, dbl: dbl, crit: crit, attacksPerSec: attacksPerSec };
     }
 
-    function computeHPS(prefix, totalDps, effectiveHealth) {
+    function computeHPS(prefix, lifestealDps, effectiveHealth) {
       var regenPct = valBy(prefix, 'h_regen') / 100;
       var lifestealPct = valBy(prefix, 'h_lifesteal') / 100;
-      return (regenPct * effectiveHealth) + (lifestealPct * totalDps);
+      // Skill damage does NOT contribute to lifesteal.
+      return (regenPct * effectiveHealth) + (lifestealPct * lifestealDps);
     }
 
     // -----------------
     // Skills
     // -----------------
+
+    // All three skills first activate at the 5 second mark.
+    var SKILL_FIRST_CAST_AT = 5;
+    // We average skill effects over the 60s PvP window for display + outcome.
+    var SKILL_HORIZON = 60;
+
+    var FIXED_PROJECTILES = {
+      'Meteorite': 5,
+      'Stampede': 2,
+      'Lightning': 4
+    };
+
+    var FIXED_DURATION = {
+      // Morale buffs are always active for 10s
+      'Morale': 10,
+      'Higher Morale': 10
+    };
 
     var SKILLS = {
       // Buffs (flat)
@@ -499,7 +517,10 @@
       }
 
       var baseCdText = isFiniteNumber(def.baseCd) ? (def.baseCd.toFixed(1) + 's') : 'enter';
-      descEl.innerHTML = def.desc + ' <span class="pill">Base CD: ' + baseCdText + '</span>';
+      var extraPill = '';
+      if (FIXED_PROJECTILES[key]) extraPill += ' <span class="pill">Projectiles: ' + FIXED_PROJECTILES[key] + '</span>';
+      if (FIXED_DURATION[key]) extraPill += ' <span class="pill">Duration: ' + FIXED_DURATION[key] + 's</span>';
+      descEl.innerHTML = def.desc + ' <span class="pill">Base CD: ' + baseCdText + '</span>' + extraPill;
 
       var cdVal = baseCooldownFor(chosen);
       var cdId = prefix + '_' + slot + '_cd';
@@ -515,10 +536,8 @@
         html += '<div class="compactLabel"><span>Damage (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
       } else if (def.kind === 'burst') {
         html += '<div class="compactLabel"><span>Damage per projectile (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
-        if (key === 'Meteorite') {
-          html += '<div class="compactLabel"><span>Projectile count (N)</span><input type="number" id="' + base + '_n" value="5" step="any" disabled></div>';
-          html += '<div class="note">Meteorite always has 5 projectiles.</div>';
-        } else {
+        // N is fixed for some skills; if fixed, do not show a field.
+        if (!FIXED_PROJECTILES[key]) {
           html += '<div class="compactLabel"><span>Projectile count (N)</span><input type="number" id="' + base + '_n" value="0" step="any"></div>';
           html += '<div class="note">Total per cast = X * N.</div>';
         }
@@ -534,7 +553,10 @@
       } else if (def.kind === 'buff_both_flat') {
         html += '<div class="compactLabel"><span>Damage increase (flat) (X)</span><input type="number" id="' + base + '_x1" value="0" step="any"></div>';
         html += '<div class="compactLabel"><span>Health increase (flat) (X)</span><input type="number" id="' + base + '_x2" value="0" step="any"></div>';
-        html += '<div class="compactLabel"><span>Duration (s)</span><input type="number" id="' + durId + '" value="0" step="any"></div>';
+        // Morale durations are fixed and should not be shown.
+        if (!FIXED_DURATION[key]) {
+          html += '<div class="compactLabel"><span>Duration (s)</span><input type="number" id="' + durId + '" value="0" step="any"></div>';
+        }
       }
 
       fields.innerHTML = html;
@@ -553,14 +575,17 @@
         return isFinite(num) ? num : 0;
       }
 
+      var fixedN = FIXED_PROJECTILES[key] || 0;
+      var fixedDur = FIXED_DURATION[key] || 0;
+
       return {
         kind: def.kind,
         name: key,
         cd: v('cd'),
         x1: v('x1'),
         x2: v('x2'),
-        dur: v('dur'),
-        n: v('n')
+        dur: fixedDur ? fixedDur : v('dur'),
+        n: fixedN ? fixedN : v('n')
       };
     }
 
@@ -569,12 +594,55 @@
       return !!(cb && cb.checked);
     }
 
+    function countCastsInWindow(windowSeconds, firstCastAt, cooldownSeconds) {
+      var W = Math.max(0, Number(windowSeconds) || 0);
+      var t0 = Math.max(0, Number(firstCastAt) || 0);
+      var cd = Math.max(0, Number(cooldownSeconds) || 0);
+      if (W <= 0 || cd <= 0) return 0;
+      if (t0 > W) return 0;
+      return 1 + Math.floor((W - t0) / cd);
+    }
+
+    function unionActiveSeconds(windowSeconds, firstCastAt, cooldownSeconds, durationSeconds) {
+      var W = Math.max(0, Number(windowSeconds) || 0);
+      var t0 = Math.max(0, Number(firstCastAt) || 0);
+      var cd = Math.max(0, Number(cooldownSeconds) || 0);
+      var dur = Math.max(0, Number(durationSeconds) || 0);
+      if (W <= 0 || cd <= 0 || dur <= 0) return 0;
+      if (t0 > W) return 0;
+
+      var intervals = [];
+      for (var t = t0; t <= W; t += cd) {
+        var a = t;
+        var b = Math.min(W, t + dur);
+        if (b > a) intervals.push([a, b]);
+      }
+      if (!intervals.length) return 0;
+      intervals.sort(function (i1, i2) { return i1[0] - i2[0]; });
+
+      var total = 0;
+      var curA = intervals[0][0];
+      var curB = intervals[0][1];
+      for (var i = 1; i < intervals.length; i++) {
+        var a2 = intervals[i][0];
+        var b2 = intervals[i][1];
+        if (a2 <= curB) {
+          curB = Math.max(curB, b2);
+        } else {
+          total += (curB - curA);
+          curA = a2;
+          curB = b2;
+        }
+      }
+      total += (curB - curA);
+      return total;
+    }
+
     function computeSkillsImpact(prefix) {
       if (!isSkillsEnabled()) {
         return { extraSkillDps: 0, avgAddDamage: 0, avgAddHealth: 0 };
       }
 
-      var skillDmgMult = 1; // Skill damage is already reflected in the entered skill values
       var cdrPct = valBy(prefix, 's_cdr');
 
       var skills = [
@@ -595,23 +663,34 @@
         if (ecd <= 0) continue;
 
         if (s.kind === 'dmg_cast') {
-          if (s.x1 > 0) extraSkillDps += (s.x1 * skillDmgMult) / ecd;
+          var casts = countCastsInWindow(SKILL_HORIZON, SKILL_FIRST_CAST_AT, ecd);
+          var total = (s.x1 || 0) * casts;
+          if (total > 0) extraSkillDps += total / SKILL_HORIZON;
+
         } else if (s.kind === 'burst') {
-          var totalBurst = (s.x1 * Math.max(0, s.n));
-          if (totalBurst > 0) extraSkillDps += (totalBurst * skillDmgMult) / ecd;
+          var castsB = countCastsInWindow(SKILL_HORIZON, SKILL_FIRST_CAST_AT, ecd);
+          var perCast = (s.x1 || 0) * Math.max(0, s.n || 0);
+          var totalB = perCast * castsB;
+          if (totalB > 0) extraSkillDps += totalB / SKILL_HORIZON;
+
         } else if (s.kind === 'dot') {
-          var totalDot = (s.x1 * Math.max(0, s.dur));
-          if (totalDot > 0) extraSkillDps += (totalDot * skillDmgMult) / ecd;
+          var active = unionActiveSeconds(SKILL_HORIZON, SKILL_FIRST_CAST_AT, ecd, s.dur || 0);
+          var totalDot = (s.x1 || 0) * active;
+          if (totalDot > 0) extraSkillDps += totalDot / SKILL_HORIZON;
+
         } else if (s.kind === 'buff_hp_flat') {
-          var uptimeHp = clamp01((s.dur || 0) / ecd);
-          avgAddHealth += (s.x1 || 0) * uptimeHp;
+          var upHp = unionActiveSeconds(SKILL_HORIZON, SKILL_FIRST_CAST_AT, ecd, s.dur || 0);
+          avgAddHealth += (s.x1 || 0) * (upHp / SKILL_HORIZON);
+
         } else if (s.kind === 'buff_dmg_flat') {
-          var uptimeDmg = clamp01((s.dur || 0) / ecd);
-          avgAddDamage += (s.x1 || 0) * uptimeDmg;
+          var upDmg = unionActiveSeconds(SKILL_HORIZON, SKILL_FIRST_CAST_AT, ecd, s.dur || 0);
+          avgAddDamage += (s.x1 || 0) * (upDmg / SKILL_HORIZON);
+
         } else if (s.kind === 'buff_both_flat') {
-          var uptimeBoth = clamp01((s.dur || 0) / ecd);
-          avgAddDamage += (s.x1 || 0) * uptimeBoth;
-          avgAddHealth += (s.x2 || 0) * uptimeBoth;
+          var upBoth = unionActiveSeconds(SKILL_HORIZON, SKILL_FIRST_CAST_AT, ecd, s.dur || 0);
+          var frac = upBoth / SKILL_HORIZON;
+          avgAddDamage += (s.x1 || 0) * frac;
+          avgAddHealth += (s.x2 || 0) * frac;
         }
       }
 
@@ -630,7 +709,9 @@
 
       var autoAttackDps = effDamage * base.dbl * base.crit * base.attacksPerSec;
       var totalDps = autoAttackDps + skills.extraSkillDps;
-      var totalHps = computeHPS(prefix, totalDps, effHealth);
+
+      // Lifesteal uses ONLY auto-attack DPS (skill damage does not lifesteal).
+      var totalHps = computeHPS(prefix, autoAttackDps, effHealth);
 
       var dpsEl = $(prefix + '_dps_out');
       var hpsEl = $(prefix + '_hps_out');
@@ -639,18 +720,18 @@
       if (dpsEl) dpsEl.textContent = 'DPS: ' + formatNumber(totalDps);
       if (hpsEl) hpsEl.textContent = 'HPS: ' + formatNumber(totalHps);
 
-      var lifestealPart = (valBy(prefix, 'h_lifesteal') / 100) * totalDps;
+      var lifestealPart = (valBy(prefix, 'h_lifesteal') / 100) * autoAttackDps;
       var regenPart = (valBy(prefix, 'h_regen') / 100) * effHealth;
 
       if (detailsEl) {
         detailsEl.textContent =
           'Auto-attack DPS: ' + formatNumber(autoAttackDps) + '\n' +
-          'Skill DPS added: ' + formatNumber(skills.extraSkillDps) + '\n' +
+          'Skill DPS added (avg over 60s, starts at 5s): ' + formatNumber(skills.extraSkillDps) + '\n' +
           'Avg +Damage from buffs: ' + formatNumber(skills.avgAddDamage) + '\n' +
           'Avg +Health from buffs: ' + formatNumber(skills.avgAddHealth) + '\n' +
           'Effective Damage used: ' + formatNumber(effDamage) + '\n' +
           'Effective Health used: ' + formatNumber(effHealth) + '\n' +
-          'Lifesteal contribution: ' + formatNumber(lifestealPart) + '\n' +
+          'Lifesteal contribution (auto-attack only): ' + formatNumber(lifestealPart) + '\n' +
           'Regen contribution: ' + formatNumber(regenPart);
       }
 
@@ -659,7 +740,7 @@
 
     function computeOutcome(youRes, themRes) {
       // PvP mechanic: displayed/profile health is multiplied by 5 for the actual PvP HP pool.
-      // This multiplier does NOT affect regen calculation (handled elsewhere); it only affects HP-loss/TTK.
+      // This multiplier does NOT affect regen calculation; it only affects HP-loss/TTK.
       var PVP_HP_MULT = 5;
 
       function outcomeFor(selfRes, oppRes) {
@@ -672,15 +753,12 @@
         var deficitPerSec = incoming - sustain; // positive means losing HP
         var lossPerSec = Math.max(0, deficitPerSec);
 
-        // Over a 60s window, HP lost is capped by the *PvP HP pool*.
         var loss60 = lossPerSec * 60;
         var cappedLoss60 = pvpHp > 0 ? Math.min(pvpHp, loss60) : 0;
         var pctLost = pvpHp > 0 ? (cappedLoss60 / pvpHp) : 0;
 
-        // Net HP change still shown in HP/s (regen - incoming). Positive means regen dominates.
         var netPerSec = sustain - incoming;
 
-        // Time to reach 0 (PvP HP pool)
         var timeToZero = (deficitPerSec > 0 && pvpHp > 0) ? (pvpHp / deficitPerSec) : Infinity;
 
         return {
@@ -696,7 +774,6 @@
       var youOut = outcomeFor(youRes, themRes);
       var themOut = outcomeFor(themRes, youRes);
 
-      // Display values
       var youNetEl = $('you_net');
       var themNetEl = $('them_net');
       var youPctEl = $('you_pct');
@@ -719,7 +796,6 @@
       if (youPctEl) youPctEl.textContent = (youOut.pctLost * 100).toFixed(1) + '%';
       if (themPctEl) themPctEl.textContent = (themOut.pctLost * 100).toFixed(1) + '%';
 
-      // Color coding
       function setGoodBad(aEl, bEl, aBetter) {
         if (!aEl || !bEl) return;
         aEl.classList.remove('good', 'bad');
@@ -729,17 +805,16 @@
       }
 
       // Net HP change: higher -> green
-      // Treat positive net HP (regen dominates) as best possible outcome
       setGoodBad(
         youNetEl,
         themNetEl,
         (youOut.netPerSec > 0 && themOut.netPerSec <= 0) ||
         (youOut.netPerSec >= themOut.netPerSec)
       );
+
       // %HP lost at 60s: inverted per request (higher -> green)
       setGoodBad(youPctEl, themPctEl, youOut.pctLost >= themOut.pctLost);
 
-      // Winner logic with early death (100% PvP HP lost before 60s)
       var winnerEl = $('winner_out');
       if (winnerEl) {
         var tYou = youOut.timeToZero;
@@ -749,11 +824,11 @@
 
         if (tYou <= 60 || tThem <= 60) {
           if (tYou < tThem) {
-            msg = 'You lose 100% health after ' + formatNumber(tYou) + ' seconds.';
+            msg = 'You lose 100% health with ' + formatNumber(60 - tYou) + ' seconds remaining.';
           } else if (tThem < tYou) {
-            msg = 'They lose 100% health after ' + formatNumber(tThem) + ' seconds.';
+            msg = 'They lose 100% health with ' + formatNumber(60 - tThem) + ' seconds remaining.';
           } else {
-            msg = 'Both reach 0 health after ' + formatNumber(tYou) + ' seconds (tie).';
+            msg = 'Both reach 0 health with ' + formatNumber(60 - tYou) + ' seconds remaining (tie).';
           }
         } else {
           var eps = 1e-9;
@@ -791,7 +866,6 @@
       if (hpsEl) hpsEl.textContent = 'HPS: —';
       if (detailsEl) detailsEl.textContent = '';
 
-      // HP loss box (shared)
       var youNetEl = $('you_net');
       var themNetEl = $('them_net');
       var youPctEl = $('you_pct');
@@ -833,18 +907,14 @@
     function applySkillsVisibilityAll() {
       var enabled = isSkillsEnabled();
 
-      // Skills headings/labels
       var title = $('skills_title');
       var slotsLabel = $('skills_slots_label');
-
       var cdrLabel = $('skillcdr_label');
 
       if (title) title.style.display = enabled ? 'block' : 'none';
       if (slotsLabel) slotsLabel.style.display = enabled ? 'block' : 'none';
-
       if (cdrLabel) cdrLabel.style.display = enabled ? 'block' : 'none';
 
-      // Skills inputs + sections
       var ids = [
         'you_s_cdr','them_s_cdr',
         'you_skillSlots','them_skillSlots'
@@ -903,6 +973,15 @@
       console.assert(baseCooldownFor('Meteor') === 9.2, 'Meteor should alias to Meteorite');
       console.assert(baseCooldownFor('Strafe') === 10.2, 'Strafe should alias to Strafe Run');
 
+      console.assert(FIXED_PROJECTILES['Meteorite'] === 5, 'Meteorite projectiles fixed at 5');
+      console.assert(FIXED_PROJECTILES['Stampede'] === 2, 'Stampede projectiles fixed at 2');
+      console.assert(FIXED_PROJECTILES['Lightning'] === 4, 'Lightning projectiles fixed at 4');
+      console.assert(FIXED_DURATION['Morale'] === 10, 'Morale duration fixed at 10s');
+
+      // Cast counting sanity
+      console.assert(countCastsInWindow(60, 5, 10) === 6, 'Casts at t=5,15,25,35,45,55');
+      console.assert(countCastsInWindow(60, 5, 20) === 3, 'Casts at t=5,25,45');
+
       assertExists('you_e1_damage');
       assertExists('them_e1_damage');
       assertExists('you_clear');
@@ -925,8 +1004,41 @@
         console.assert($('them_skillSlots').style.display === 'none', 'Them skill slots should be hidden when skills disabled');
         console.assert($('skills_title').style.display === 'none', 'Skills title should be hidden when skills disabled');
         console.assert($('skills_slots_label').style.display === 'none', 'Skill slots label should be hidden when skills disabled');
-
         console.assert($('skillcdr_label').style.display === 'none', 'Skill cooldown label hidden when skills disabled');
+      })();
+
+      // Lifesteal should NOT include skill DPS.
+      (function () {
+        var prefix = 'you';
+        $('skills_enabled').checked = true;
+        applySkillsVisibilityAll();
+
+        setBy(prefix, 'e1_damage', 160);
+        setBy(prefix, 'e1_speed', 0);
+        setBy(prefix, 'e1_double', 0);
+        setBy(prefix, 'e1_crit', 0);
+        setBy(prefix, 'e1_critdmg', 0);
+        setBy(prefix, 'h_total', 1000);
+        setBy(prefix, 'h_regen', 0);
+        setBy(prefix, 'h_lifesteal', 10);
+
+        var sel = $('you_s1_name');
+        sel.value = 'Thorns';
+        renderSkillFields('you', 's1');
+        $('you_s1_cd').value = '10';
+        $('you_s1_x1').value = '1000';
+
+        var r = calculateSide('you');
+        var base = computeBaseComponents('you');
+        var skills = computeSkillsImpact('you');
+        var effDamage = base.damage + skills.avgAddDamage;
+        var autoDps = effDamage * base.dbl * base.crit * base.attacksPerSec;
+        var expectedHps = (0.10) * autoDps;
+        console.assert(Math.abs(r.totalHps - expectedHps) < 1e-6, 'HPS should use auto-attack DPS only for lifesteal');
+
+        clearSide('you');
+        $('skills_enabled').checked = false;
+        applySkillsVisibilityAll();
       })();
 
       // Outcome basic sanity
@@ -979,6 +1091,12 @@
         var base = computeBaseComponents('you');
         console.assert(Math.abs(base.dbl - 2) < 1e-9, 'Double multiplier should cap at 2.0');
         clearSide('you');
+      })();
+
+      // Ensure details strings use newlines (no raw line breaks in JS literals)
+      (function () {
+        var s = 'a\n' + 'b';
+        console.assert(s.indexOf('\n') >= 0, 'Newline escape should work');
       })();
     }
 

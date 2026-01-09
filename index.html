@@ -261,7 +261,7 @@
 
         <!-- Enable skills toggle (single, centered) -->
         <div class="skillsSpacer"></div>
-        <label id="skills_toggle" style="display:flex;align-items:center;gap:8px;justify-content:center;margin:0;">
+        <label id="skills_toggle" class="skillsToggle">
           <input type="checkbox" id="skills_enabled" />
           <span style="font-weight:650;">Enable skills</span>
         </label>
@@ -408,7 +408,8 @@
       var dbl = 1 + dblChance;
       var crit = 1 + (critChance * critDmg);
 
-      var denom = Math.round(1.5 + (15 / (1 + speed)));
+      // Matches original Kayzee formula
+      var denom = Math.round(15 / (1 + speed));
       var attacksPerSec = denom <= 0 ? 0 : 10 / denom;
 
       return { damage: damage, dbl: dbl, crit: crit, attacksPerSec: attacksPerSec };
@@ -1093,10 +1094,23 @@
         clearSide('you');
       })();
 
-      // Ensure details strings use newlines (no raw line breaks in JS literals)
+      // Ensure details strings use escaped newlines (no raw line breaks in JS literals)
       (function () {
-        var s = 'a\n' + 'b';
-        console.assert(s.indexOf('\n') >= 0, 'Newline escape should work');
+        var s = 'a\\n' + 'b';
+        console.assert(s.indexOf('\\n') >= 0, 'Newline escape should work');
+      })();
+
+      // Attack speed curve should match original: 111% -> ~1.4286 APS
+      (function () {
+        setBy('you', 'e1_damage', 100);
+        setBy('you', 'e1_speed', 111);
+        setBy('you', 'e1_double', 0);
+        setBy('you', 'e1_crit', 0);
+        setBy('you', 'e1_critdmg', 0);
+        var base = computeBaseComponents('you');
+        var aps = base.attacksPerSec;
+        console.assert(Math.abs(aps - (10/7)) < 1e-9, '111% AS should give 10/7 ≈ 1.4286 APS');
+        clearSide('you');
       })();
     }
 
@@ -1117,5 +1131,16 @@
       runTests();
     });
   </script>
+
+  <style>
+    /* Avoid inline style attributes showing up as raw text if HTML ever breaks */
+    .skillsToggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      margin: 0;
+    }
+  </style>
 </body>
 </html>
